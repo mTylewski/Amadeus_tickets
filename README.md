@@ -1,4 +1,3 @@
-[amadeus_flight_monitor_readme.md](https://github.com/user-attachments/files/21983287/amadeus_flight_monitor_readme.md)
 # ✈️ Flight Price Monitor - n8n Workflow
 
 Automated flight price monitoring system with Telegram notifications. This workflow searches for flights from Polish cities to popular European island destinations and sends alerts about attractive deals.
