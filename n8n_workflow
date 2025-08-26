@@ -1,0 +1,305 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "// KONFIGURACJA - PODMIEŃ WARTOŚCI PONIŻEJ!\nconst CONFIG = {\n  maxFlightPrice: 700,\n  maxHotelPricePerNight: 200,\n  maxMotorcyclePricePerDay: 50,\n  tripDurationDays: 4,\n  searchFromDays: 2,\n  searchToDays: 7,\n  telegramChatId: 'TWOJ_TELEGRAM_CHAT_ID',  // <- PODMIEŃ NA SWÓJ CHAT ID\n  amadeusClientId: 'TWOJ_AMADEUS_CLIENT_ID',  // <- PODMIEŃ NA SWÓJ CLIENT ID\n  amadeusClientSecret: 'TWOJ_AMADEUS_CLIENT_SECRET',  // <- PODMIEŃ NA SWÓJ SECRET\n  rapidApiKey: 'TWOJ_RAPIDAPI_KEY'  // <- PODMIEŃ NA SWÓJ KLUCZ API\n};\n\nconst polishAirports = [\n  {code: 'WRO', city: 'Wrocław'}\n  // Możesz dodać więcej lotnisk:\n  // {code: 'WAW', city: 'Warszawa'},\n  // {code: 'KRK', city: 'Kraków'},\n  // {code: 'GDN', city: 'Gdańsk'},\n  // {code: 'KTW', city: 'Katowice'},\n  // {code: 'POZ', city: 'Poznań'}\n];\n\nconst islandDestinations = [\n  // Grecja - Kreta\n  {code: 'HER', name: 'Kreta', city: 'Heraklion'},\n  {code: 'CHQ', name: 'Kreta Chania', city: 'Chania'},\n  // Malta\n  {code: 'MLA', name: 'Malta', city: 'Valletta'}\n  // Możesz dodać więcej destynacji:\n  // {code: 'PMI', name: 'Majorka', city: 'Palma'},\n  // {code: 'IBZ', name: 'Ibiza', city: 'Ibiza'},\n  // {code: 'TFS', name: 'Teneryfa', city: 'Teneryfa'},\n  // {code: 'LPA', name: 'Gran Canaria', city: 'Las Palmas'},\n  // {code: 'CFU', name: 'Korfu', city: 'Korfu'},\n  // {code: 'RHO', name: 'Rodos', city: 'Rodos'},\n  // {code: 'SKG', name: 'Saloniki', city: 'Thessaloniki'}\n];\n\nconst searchDates = [];\nfor (let i = CONFIG.searchFromDays; i <= CONFIG.searchToDays; i += 14) {\n  const departureDate = new Date();\n  departureDate.setDate(departureDate.getDate() + i);\n  searchDates.push(departureDate.toISOString().split('T')[0]);\n}\n\nconst combinations = [];\nfor (const origin of polishAirports) {\n  for (const destination of islandDestinations) {\n    for (const date of searchDates.slice(0, 1)) {\n      const returnDate = new Date(date);\n      returnDate.setDate(returnDate.getDate() + CONFIG.tripDurationDays);\n      \n      combinations.push({\n        json: {\n          ...CONFIG,\n          origin: origin.code,\n          originCity: origin.city,\n          destination: destination.code,\n          destinationName: destination.name,\n          destinationCity: destination.city,\n          departureDate: date,\n          returnDate: returnDate.toISOString().split('T')[0]\n        }\n      });\n    }\n  }\n}\n\nreturn combinations;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        48,
+        0
+      ],
+      "id": "c5d8bbe9-2d23-4d80-bb76-4783f8a650e8",
+      "name": "Konfiguracja"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://test.api.amadeus.com/v1/security/oauth2/token",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/x-www-form-urlencoded"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "grant_type",
+              "value": "client_credentials"
+            },
+            {
+              "name": "client_id",
+              "value": "={{ $json.amadeusClientId }}"
+            },
+            {
+              "name": "client_secret",
+              "value": "={{ $json.amadeusClientSecret }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "name": "Get Amadeus Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        240,
+        0
+      ],
+      "id": "0b44ac35-0ce9-4f7e-b9db-9af9eaaa75c6"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "e7272d07-1e73-4913-a53f-22f85626877c",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "amount": 15,
+        "unit": "seconds"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        656,
+        0
+      ],
+      "id": "9e63ec09-7e40-4ae2-a9df-3e78f3dec2a7",
+      "name": "Wait",
+      "webhookId": "PODMIEN-NA-SWOJ-WEBHOOK-ID"
+    },
+    {
+      "parameters": {
+        "url": "https://test.api.amadeus.com/v2/shopping/flight-offers",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "originLocationCode",
+              "value": "={{ $json.origin }}"
+            },
+            {
+              "name": "destinationLocationCode",
+              "value": "={{ $json.destination }}"
+            },
+            {
+              "name": "departureDate",
+              "value": "={{ $json.departureDate }}"
+            },
+            {
+              "name": "returnDate",
+              "value": "={{ $json.returnDate }}"
+            },
+            {
+              "name": "adults",
+              "value": "2"
+            },
+            {
+              "name": "max",
+              "value": "3"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Get Amadeus Token').item.json.access_token }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "name": "Search Flights",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        848,
+        0
+      ],
+      "id": "587c167d-7892-4453-8b86-da4381706b21",
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pobierz dane z odpowiedzi API\nconst apiResponse = items[0].json;\n\n// Pobierz oryginalne dane konfiguracji\n// Mogą być w różnych miejscach zależnie od tego jak n8n przekazuje dane\nconst originalData = $('Konfiguracja').item.json;\n\n// Debug - zobaczmy co mamy\nconsole.log(\"Original data from Konfiguracja:\", originalData);\nconsole.log(\"Current $json:\", $json);\n\n// Sprawdź czy są dane z API\nif (!apiResponse) {\n  return [];\n}\n\n// Jeśli data jest stringiem, sparsuj JSON\nlet flightData = apiResponse;\nif (typeof flightData.data === 'string') {\n  flightData = JSON.parse(flightData.data);\n}\n\n// Sprawdź czy jest odpowiedź z API z lotami\nif (!flightData.data || flightData.data.length === 0) {\n  console.log(\"Brak danych lotów w odpowiedzi API\");\n  return [{\n    json: {\n      noFlights: true,\n      message: \"Brak dostępnych lotów dla tej trasy\",\n      origin: originalData.origin || $json.origin,\n      originCity: originalData.originCity || $json.originCity,\n      destination: originalData.destination || $json.destination,\n      destinationName: originalData.destinationName || $json.destinationName,\n      destinationCity: originalData.destinationCity || $json.destinationCity,\n      departureDate: originalData.departureDate || $json.departureDate,\n      returnDate: originalData.returnDate || $json.returnDate,\n      telegramChatId: originalData.telegramChatId || 'TWOJ_TELEGRAM_CHAT_ID'\n    }\n  }];\n}\n\nlet cheapestOffer = null;\nlet lowestPrice = Infinity;\n\n// Znajdź najtańszą ofertę\nfor (const offer of flightData.data) {\n  const price = parseFloat(offer.price.total);\n  if (price < lowestPrice) {\n    lowestPrice = price;\n    cheapestOffer = offer;\n  }\n}\n\n// Sprawdź limit cenowy\nconst maxPrice = originalData.maxFlightPrice || 700;\nconsole.log(`Najtańszy lot: ${lowestPrice} ${cheapestOffer.price.currency}, limit: ${maxPrice} PLN`);\n\n// Konwersja EUR na PLN (przybliżona)\nconst eurToPln = 4.3;\nconst priceInPln = cheapestOffer.price.currency === 'EUR' ? lowestPrice * eurToPln : lowestPrice;\n\nconsole.log(`Cena w PLN: ${priceInPln}`);\nconsole.log(`Dane trasy: ${originalData.originCity} -> ${originalData.destinationName}, daty: ${originalData.departureDate} - ${originalData.returnDate}`);\n\nif (priceInPln > maxPrice) {\n  console.log(`Lot za drogi: ${priceInPln} PLN > ${maxPrice} PLN`);\n  \n  // Zwróć komunikat o braku atrakcyjnych ofert Z WSZYSTKIMI DANYMI\n  return [{\n    json: {\n      noAttractiveDeal: true,\n      message: `Brak atrakcyjnych ofert`,\n      origin: originalData.origin || $json.origin,\n      originCity: originalData.originCity || $json.originCity,\n      destination: originalData.destination || $json.destination,\n      destinationName: originalData.destinationName || $json.destinationName,\n      destinationCity: originalData.destinationCity || $json.destinationCity,\n      departureDate: originalData.departureDate || $json.departureDate,\n      returnDate: originalData.returnDate || $json.returnDate,\n      cheapestPrice: Math.round(priceInPln),\n      maxPrice: maxPrice,\n      difference: Math.round(priceInPln - maxPrice),\n      currency: \"PLN\",\n      telegramChatId: originalData.telegramChatId || 'TWOJ_TELEGRAM_CHAT_ID'\n    }\n  }];\n}\n\n// Przygotuj szczegóły lotu - znaleziono atrakcyjną ofertę\nconst flightDetails = {\n  // Przekaż wszystkie oryginalne dane\n  origin: originalData.origin || $json.origin,\n  originCity: originalData.originCity || $json.originCity,\n  destination: originalData.destination || $json.destination,\n  destinationName: originalData.destinationName || $json.destinationName,\n  destinationCity: originalData.destinationCity || $json.destinationCity,\n  departureDate: originalData.departureDate || $json.departureDate,\n  returnDate: originalData.returnDate || $json.returnDate,\n  \n  // Dodaj informacje o locie\n  flightPrice: Math.round(priceInPln),\n  flightPriceOriginal: lowestPrice,\n  flightCurrency: cheapestOffer.price.currency,\n  airline: cheapestOffer.itineraries[0].segments[0].carrierCode,\n  flightNumber: cheapestOffer.itineraries[0].segments[0].number || '',\n  \n  // Szczegóły lotu\n  departureTime: cheapestOffer.itineraries[0].segments[0].departure.at,\n  arrivalTime: cheapestOffer.itineraries[0].segments[0].arrival.at,\n  \n  // Klasyfikacja oferty (na podstawie ceny w PLN)\n  isSuperDeal: priceInPln < (maxPrice * 0.7), // Poniżej 490 PLN = super okazja\n  isGoodDeal: priceInPln <= maxPrice, // Do 700 PLN = dobra oferta\n  savings: Math.round(maxPrice - priceInPln),\n  savingsPercent: Math.round(((maxPrice - priceInPln) / maxPrice) * 100),\n  \n  // Dodatkowe informacje\n  numberOfOffers: flightData.data.length,\n  searchTimestamp: new Date().toISOString(),\n  telegramChatId: originalData.telegramChatId || 'TWOJ_TELEGRAM_CHAT_ID',\n  \n  // Informacje o przesiadkach\n  stops: cheapestOffer.itineraries[0].segments.length - 1,\n  duration: cheapestOffer.itineraries[0].duration,\n  \n  // Pozostałe dane konfiguracji\n  maxFlightPrice: originalData.maxFlightPrice,\n  maxHotelPricePerNight: originalData.maxHotelPricePerNight,\n  maxMotorcyclePricePerDay: originalData.maxMotorcyclePricePerDay,\n  tripDurationDays: originalData.tripDurationDays\n};\n\nconsole.log(`Znaleziono lot: ${flightDetails.originCity} -> ${flightDetails.destinationName}, ${flightDetails.flightPrice} PLN, Super deal: ${flightDetails.isSuperDeal}, Good deal: ${flightDetails.isGoodDeal}`);\n\nreturn [{ json: flightDetails }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        0
+      ],
+      "id": "20d33e14-16b9-4fc6-b433-f992bd8a2b3f",
+      "name": "Process Flights"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = items[0].json;\n\n// Bezpieczne pobieranie danych z fallbackami\nconst origin = data.originCity || data.origin || 'Wrocław';\nconst destination = data.destinationName || data.destinationCity || data.destination || 'Nieznane';\nconst departureDate = data.departureDate || data.date || 'Nieznana data';\nconst returnDate = data.returnDate || 'Nieznana data';\n\n// Funkcja do formatowania daty\nconst formatDate = (dateStr) => {\n  if (!dateStr || dateStr === 'Nieznana data') return 'Nieznana data';\n  try {\n    const date = new Date(dateStr);\n    if (isNaN(date.getTime())) return dateStr;\n    const options = { day: '2-digit', month: '2-digit', year: 'numeric' };\n    return date.toLocaleDateString('pl-PL', options);\n  } catch {\n    return dateStr;\n  }\n};\n\nlet message = '';\n\nif (data.noAttractiveDeal) {\n  message = `❌ BRAK ATRAKCYJNYCH OFERT ❌\\n\\n`;\n  message += `✈️ Trasa: ${origin} ➡️ ${destination}\\n`;\n  message += `📅 Data wylotu: ${formatDate(departureDate)}\\n`;\n  message += `🔙 Data powrotu: ${formatDate(returnDate)}\\n`;\n  message += `💰 Najtańszy lot: ${data.cheapestPrice} PLN\\n`;\n  message += `🎯 Twój limit: ${data.maxPrice} PLN\\n`;\n  message += `📈 Za drogi o: ${data.difference} PLN\\n\\n`;\n  message += `#TanieLoty #BrakOfert`;\n\n} else if (data.noFlights) {\n  message = `❌ BRAK DOSTĘPNYCH LOTÓW ❌\\n\\n`;\n  message += `✈️ Trasa: ${origin} ➡️ ${destination}\\n`;\n  message += `📅 Data wylotu: ${formatDate(departureDate)}\\n`;\n  message += `🔙 Data powrotu: ${formatDate(returnDate)}\\n\\n`;\n  message += `#TanieLoty #BrakLotów`;\n\n} else if (data.isSuperDeal) {\n  message = `🚀 SUPER OKAZJA! 🚀\\n\\n`;\n  message += `✈️ LOT: ${origin} ➡️ ${destination}\\n`;\n  message += `💰 Cena: ${data.flightPrice} PLN (${data.flightPriceOriginal} ${data.flightCurrency})\\n`;\n  message += `📅 Wylot: ${formatDate(departureDate)}\\n`;\n  message += `🔙 Powrót: ${formatDate(returnDate)}\\n`;\n  message += `🕒 Godzina wylotu: ${data.departureTime ? new Date(data.departureTime).toLocaleTimeString('pl-PL', {hour: '2-digit', minute: '2-digit'}) : 'N/A'}\\n`;\n  message += `🕒 Godzina przylotu: ${data.arrivalTime ? new Date(data.arrivalTime).toLocaleTimeString('pl-PL', {hour: '2-digit', minute: '2-digit'}) : 'N/A'}\\n`;\n  message += `✈️ Linia: ${data.airline}\\n`;\n  message += `⏱️ Czas lotu: ${data.duration}\\n`;\n  message += `🔄 Przesiadki: ${data.stops}\\n\\n`;\n  message += `💎 Oszczędzasz: ${data.savings} PLN (${data.savingsPercent}%)\\n\\n`;\n  message += `⚡ REZERWUJ NATYCHMIAST!\\n\\n`;\n  message += `#TanieLoty #SuperOkazja #${destination.replace(/ /g, '')}`;\n\n} else if (data.isGoodDeal) {\n  message = `✅ DOBRA OFERTA! ✅\\n\\n`;\n  message += `✈️ LOT: ${origin} ➡️ ${destination}\\n`;\n  message += `💰 Cena: ${data.flightPrice} PLN (${data.flightPriceOriginal} ${data.flightCurrency})\\n`;\n  message += `📅 Wylot: ${formatDate(departureDate)}\\n`;\n  message += `🔙 Powrót: ${formatDate(returnDate)}\\n`;\n  message += `🕒 Godzina wylotu: ${data.departureTime ? new Date(data.departureTime).toLocaleTimeString('pl-PL', {hour: '2-digit', minute: '2-digit'}) : 'N/A'}\\n`;\n  message += `🕒 Godzina przylotu: ${data.arrivalTime ? new Date(data.arrivalTime).toLocaleTimeString('pl-PL', {hour: '2-digit', minute: '2-digit'}) : 'N/A'}\\n`;\n  message += `✈️ Linia: ${data.airline}\\n`;\n  message += `⏱️ Czas lotu: ${data.duration}\\n`;\n  message += `🔄 Przesiadki: ${data.stops}\\n\\n`;\n  if (data.savings > 0) {\n    message += `💰 Oszczędzasz: ${data.savings} PLN (${data.savingsPercent}%)\\n\\n`;\n  }\n  message += `👍 Warto rozważyć!\\n\\n`;\n  message += `#TanieLoty #DobraOferta #${destination.replace(/ /g, '')}`;\n}\n\nreturn [{\n  json: {\n    chatId: data.telegramChatId || 'TWOJ_TELEGRAM_CHAT_ID',\n    text: message\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1248,
+        0
+      ],
+      "id": "d4ea198c-7116-4fac-b390-235d01b1bba0",
+      "name": "Format Message"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.text }}",
+        "additionalFields": {}
+      },
+      "name": "Send Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.1,
+      "position": [
+        1456,
+        0
+      ],
+      "id": "d305dfdc-d7ca-4107-b032-42536a942378",
+      "webhookId": "PODMIEN-NA-SWOJ-WEBHOOK-ID",
+      "credentials": {
+        "telegramApi": {
+          "id": "TWOJE_TELEGRAM_CREDENTIAL_ID",
+          "name": "Telegram API Credentials"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -192,
+        0
+      ],
+      "id": "6c7dee45-ff5b-4c2b-9fd5-e0f13e4508ef",
+      "name": "When clicking 'Execute workflow'"
+    }
+  ],
+  "connections": {
+    "Konfiguracja": {
+      "main": [
+        [
+          {
+            "node": "Get Amadeus Token",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Get Amadeus Token": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Search Flights",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Flights": {
+      "main": [
+        [
+          {
+            "node": "Process Flights",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Flights": {
+      "main": [
+        [
+          {
+            "node": "Format Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Message": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking 'Execute workflow'": {
+      "main": [
+        [
+          {
+            "node": "Konfiguracja",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": "YOUR_INSTANCE_ID"
+  }
+}
